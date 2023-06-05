@@ -1,0 +1,4 @@
+SubnetId: __K8S_SUBNET_ID__
+IngressExternalIp: __ALB_INGRESS_EXTERNAL_IP__
+certid: __CERT_ID__
+fqdn: your-domain.test

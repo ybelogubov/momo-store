@@ -1,0 +1,26 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: default
+  annotations:
+    ingress.alb.yc.io/subnets: {{ .Values.SubnetId }}
+    ingress.alb.yc.io/external-ipv4-address: {{ .Values.IngressExternalIp }}
+    ingress.alb.yc.io/group-name: "momo-store-alb-group"
+spec:
+  tls:
+    - hosts:
+        - grafana.{{ .Values.fqdn }}
+      secretName: yc-certmgr-cert-id-{{ .Values.certid }}
+  rules:
+    - host: grafana.{{ .Values.fqdn }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000

@@ -1,0 +1,163 @@
+
+---
+kind: Secret
+apiVersion: v1
+metadata:
+  name: docker-config-secret
+  namespace: default
+data:
+  .dockerconfigjson: >-
+          __GITLAB_REGISTRY_K8S_KEY__
+type: kubernetes.io/dockerconfigjson
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-conf
+  namespace: default
+data:
+  nginx.conf: |
+    user  nginx;
+    worker_processes  auto;
+    error_log  /var/log/nginx/error.log notice;
+    pid        /var/run/nginx.pid;
+    events {
+        worker_connections  1024;
+    }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+
+        log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                          '$status $body_bytes_sent "$http_referer" '
+                          '"$http_user_agent" "$http_x_forwarded_for"';
+
+        access_log  /var/log/nginx/access.log  main;
+
+        sendfile        on;
+        keepalive_timeout  65;
+        server {
+
+          listen 80;
+
+          location / {
+            root   /usr/share/nginx/html;
+            index  index.html;
+            try_files $uri $uri/ /index.html;
+          }
+
+          location /products {
+              proxy_pass http://backend:8081;
+          }
+
+          location /categories {
+              proxy_pass http://backend:8081;
+          }
+
+          location /orders {
+              proxy_pass http://backend:8081;
+          }
+
+          location /metrics {
+              proxy_pass http://backend:8081;
+          }
+
+          location /auth/whoami {
+              proxy_pass http://backend:8081;
+          }
+
+          location /api {
+              proxy_pass http://backend:8081;
+          }
+        }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: default
+  labels:
+    app: frontend
+spec:
+  replicas: 2
+  revisionHistoryLimit: 15
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: gitlab.praktikum-services.ru:5050/yu.belogubov/momo-store/momo-store-frontend:__VERSION__
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+          ports:
+            - name: frontend
+              containerPort: 80
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: nginx-conf
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+      imagePullSecrets:
+        - name: docker-config-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: default
+  labels:
+    app: frontend
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+      nodePort: 30082
+  selector:
+    app: frontend
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend
+  namespace: default
+  annotations:
+    ingress.alb.yc.io/subnets: __K8S_SUBNET_ID__
+    ingress.alb.yc.io/external-ipv4-address: __ALB_INGRESS_EXTERNAL_IP__
+    ingress.alb.yc.io/group-name: "momo-store-alb-group"
+spec:
+  tls:
+    - hosts:
+        - ibelogubov.ru
+      secretName: yc-certmgr-cert-id-__CERT_ID__
+  rules:
+    - host: ibelogubov.ru
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

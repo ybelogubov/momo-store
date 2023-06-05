@@ -1,0 +1,72 @@
+include:
+  - project: 'templates/ci'
+    file: 'DockerInDockerTemplate.yml'
+  - template: Jobs/SAST.gitlab-ci.yml
+
+variables:
+  VERSION: 0.1.${CI_PIPELINE_ID}
+  SAST_EXCLUDED_ANALYZERS: "eslint,semgrep,nodejs-scan,gosec"
+    
+stages:
+  - build
+  - test
+  - helm-package
+
+build-backend:
+  stage: build
+  image: docker:20.10.12-dind-rootless
+  before_script:
+    - until docker info; do sleep 1; done
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - cd backend
+    - >
+      docker build
+      --build-arg VERSION=$VERSION
+      --tag $CI_REGISTRY_IMAGE/momo-store-backend:$CI_COMMIT_SHORT_SHA
+      .
+    - docker push $CI_REGISTRY_IMAGE/momo-store-backend:$CI_COMMIT_SHORT_SHA
+
+sonarqube-check:
+  stage: test
+  image:
+    name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar" 
+    SONAR_TOKEN: ${SONAR_LOGIN_BACK}
+    SONAR_HOST_URL: ${SONARQUBE_URL}
+    GIT_DEPTH: "0"
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script:
+    - cd backend
+    - sonar-scanner -Dsonar.qualitygate.wait=true -Dsonar.projectKey=${SONAR_BACK_PRJ_KEY}
+  allow_failure: true
+
+helm-package:
+  stage: helm-package
+  image:
+    name: dtzar/helm-kubectl:3.10.3
+  script:
+    - sed -i "s/__GITLAB_REGISTRY_K8S_KEY__/$GITLAB_REGISTRY_K8S_KEY/" helm/momo-store-backend-chart/templates/secrets.yaml
+    - sed -i "s/__TAG__/$CI_COMMIT_SHORT_SHA/" helm/momo-store-backend-chart/values.yaml
+    - sed -i "s/__VERSION__/$VERSION/" helm/momo-store-backend-chart/Chart.yaml
+    - helm package helm/momo-store-backend-chart/ --version ${VERSION}
+    - curl -u ${HELM_REPO_USER}:${HELM_REPO_PASS} ${HELM_REPO} --upload-file /builds/yu.belogubov/momo-store/momo-store-backend-${VERSION}.tgz
+
+#block describes deploy method by using kubectl - manifests being stored in the ./kubernetes/
+#
+#deploy:
+#  image: gcr.io/cloud-builders/kubectl:latest
+#  stage: deploy
+#  script:
+#    - kubectl config set-cluster k8s --server="$KUBE_URL" --insecure-skip-tls-verify=true
+#    - kubectl config set-credentials admin --token="$KUBE_TOKEN"
+#    - kubectl config set-context default --cluster=k8s --user=admin
+#    - kubectl config use-context default
+#    - sed -i "s/__VERSION__/$CI_COMMIT_SHORT_SHA/" kubernetes/backend/deployment.yaml
+#    - sed -i "s/__GITLAB_REGISTRY_K8S_KEY__/$GITLAB_REGISTRY_K8S_KEY/" kubernetes/backend/deployment.yaml
+#    - kubectl apply -f kubernetes/backend/deployment.yaml

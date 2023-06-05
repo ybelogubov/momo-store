@@ -1,0 +1,69 @@
+variables:
+  VERSION: 1.0.${CI_PIPELINE_ID}
+    
+stages:
+  - prometheus-helm-package
+  - grafana-helm-package
+  - deploy-prometheus
+  - deploy-grafana
+  - deploy-loki
+
+prometheus-helm-package:
+  stage: prometheus-helm-package
+  image:
+    name: dtzar/helm-kubectl:3.10.3
+  script:
+    - sed -i "s/__CERT_ID__/$CERT_ID/" helm/prometheus-chart/values.yaml
+    - sed -i "s/__ALB_INGRESS_EXTERNAL_IP__/$ALB_INGRESS_EXTERNAL_IP/" helm/prometheus-chart/values.yaml
+    - sed -i "s/__K8S_SUBNET_ID__/$K8S_SUBNET_ID/" helm/prometheus-chart/values.yaml
+    - sed -i "s/__VERSION__/$VERSION/" helm/prometheus-chart/Chart.yaml
+    - helm package helm/prometheus-chart --version ${VERSION}
+    - curl -u ${HELM_REPO_USER}:${HELM_REPO_PASS} ${HELM_REPO} --upload-file /builds/yu.belogubov/momo-store/prometheus-${VERSION}.tgz
+
+grafana-helm-package:
+  stage: grafana-helm-package
+  image:
+    name: dtzar/helm-kubectl:3.10.3
+  script:
+    - sed -i "s/__CERT_ID__/$CERT_ID/" helm/grafana-chart/values.yaml
+    - sed -i "s/__ALB_INGRESS_EXTERNAL_IP__/$ALB_INGRESS_EXTERNAL_IP/" helm/grafana-chart/values.yaml
+    - sed -i "s/__K8S_SUBNET_ID__/$K8S_SUBNET_ID/" helm/grafana-chart/values.yaml
+    - sed -i "s/__VERSION__/$VERSION/" helm/grafana-chart/Chart.yaml
+    - helm package helm/grafana-chart --version ${VERSION}
+    - curl -u ${HELM_REPO_USER}:${HELM_REPO_PASS} ${HELM_REPO} --upload-file /builds/yu.belogubov/momo-store/grafana-${VERSION}.tgz
+
+deploy-prometheus:
+  image: dtzar/helm-kubectl:3.10.3
+  stage: deploy-prometheus
+  script:
+    - kubectl config set-cluster k8s --server="$KUBE_URL" --insecure-skip-tls-verify=true
+    - kubectl config set-credentials admin --token="$KUBE_TOKEN"
+    - kubectl config set-context default --cluster=k8s --user=admin --namespace=default
+    - kubectl config use-context default
+    - helm repo add nexus $HELM_REPO --username $HELM_REPO_USER --password $HELM_REPO_PASS
+    - helm repo update
+    - helm upgrade prometheus nexus/prometheus -i --atomic --set fqdn=$FQDN
+
+deploy-grafana:
+  image: dtzar/helm-kubectl:3.10.3
+  stage: deploy-grafana
+  script:
+    - kubectl config set-cluster k8s --server="$KUBE_URL" --insecure-skip-tls-verify=true
+    - kubectl config set-credentials admin --token="$KUBE_TOKEN"
+    - kubectl config set-context default --cluster=k8s --user=admin --namespace=default
+    - kubectl config use-context default
+    - helm repo add nexus $HELM_REPO --username $HELM_REPO_USER --password $HELM_REPO_PASS
+    - helm repo update
+    - helm upgrade grafana nexus/grafana -i --atomic --set fqdn=$FQDN
+
+deploy-loki:
+  image: dtzar/helm-kubectl:3.10.3
+  stage: deploy-loki
+  script:
+    - kubectl config set-cluster k8s --server="$KUBE_URL" --insecure-skip-tls-verify=true
+    - kubectl config set-credentials admin --token="$KUBE_TOKEN"
+    - kubectl config set-context default --cluster=k8s --user=admin --namespace=default
+    - kubectl config use-context default
+    - helm repo add loki https://grafana.github.io/loki/charts
+    - helm repo update
+    - helm upgrade --install loki loki/loki-stack

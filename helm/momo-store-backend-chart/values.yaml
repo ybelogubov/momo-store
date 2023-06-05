@@ -1,0 +1,9 @@
+image:
+ path: gitlab.praktikum-services.ru:5050/yu.belogubov/momo-store/momo-store-backend
+ tag: __TAG__
+containerPortDeployment: 8081
+replicasNumber: 2
+deploymentType: RollingUpdate
+maxUnavailablePodDeployment: 1
+maxSurgeDeployment: 20%
+

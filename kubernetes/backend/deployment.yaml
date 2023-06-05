@@ -1,0 +1,72 @@
+
+---
+kind: Secret
+apiVersion: v1
+metadata:
+  name: docker-config-secret
+  namespace: default
+data:
+  .dockerconfigjson: >-
+          __GITLAB_REGISTRY_K8S_KEY__
+type: kubernetes.io/dockerconfigjson
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: default
+  labels:
+    app: backend
+spec:
+  replicas: 2
+  revisionHistoryLimit: 15
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 20%
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: gitlab.praktikum-services.ru:5050/yu.belogubov/momo-store/momo-store-backend:__VERSION__
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: backend
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              host: localhost
+              path: /health
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 1
+            failureThreshold: 6
+      imagePullSecrets:
+        - name: docker-config-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: default
+  labels:
+    app: backend
+spec:
+  type: NodePort
+  ports:
+    - port: 8081
+      protocol: TCP
+      targetPort: 8081
+      nodePort: 30081
+  selector:
+    app: backend

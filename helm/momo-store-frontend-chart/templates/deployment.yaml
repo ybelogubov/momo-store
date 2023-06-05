@@ -1,0 +1,50 @@
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-{{ .Release.Name }}
+  namespace: default
+  labels:
+    app.kubernetes.io/name: momo-frontend
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/version: "{{ .Chart.AppVersion }}"
+    app.kubernetes.io/managed-by: "{{ .Release.Service }}"
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: momo-store
+spec:
+  replicas: {{ .Values.replicasNumber }}
+  revisionHistoryLimit: 15
+  strategy:
+    type: {{ .Values.deploymentType }}
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: {{ .Values.image.path }}:{{ .Values.image.tag }}
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: {{ .Values.templateMountPath }}
+              subPath: nginx.conf
+              readOnly: true
+          ports:
+            - name: frontend
+              containerPort: {{ .Values.containerPortDeployment }}
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: nginx-conf
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+      imagePullSecrets:
+        - name: docker-config-secret
+

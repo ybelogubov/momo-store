@@ -1,0 +1,44 @@
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-{{ .Release.Name }}
+  namespace: default
+  labels:
+    app.kubernetes.io/name: momo-backend
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/version: "{{ .Chart.AppVersion }}"
+    app.kubernetes.io/managed-by: "{{ .Release.Service }}"
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: momo-store
+spec:
+  replicas: {{ .Values.replicasNumber }}
+  revisionHistoryLimit: 15
+  strategy:
+    type: {{ .Values.deploymentType }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.maxUnavailablePodDeployment }}
+      maxSurge: {{ .Values.maxSurgeDeployment }}
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8081"
+        prometheus.io/scrape: "true"
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: {{ .Values.image.path }}:{{ .Values.image.tag }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: backend
+              containerPort: {{ .Values.containerPortDeployment }}
+      imagePullSecrets:
+        - name: docker-config-secret

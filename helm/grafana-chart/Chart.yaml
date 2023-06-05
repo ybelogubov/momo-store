@@ -1,0 +1,6 @@
+apiVersion: v2
+name: grafana
+description: grafana chart for momo-store installation
+type: application
+version: __VERSION__
+appVersion: __VERSION__
