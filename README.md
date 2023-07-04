@@ -1,17 +1,34 @@
 # momo-store
-The repository contains code and additional tools for automated deploy of dumplings store into Managed K8S cluster located in Yandex Cloud infrastructure.
+The repository contains code and additional tools for automated deploy of dumplings store into Managed K8S cluster located in Yandex Cloud infrastructure. Please note, project was developed and supposed to be initiated in GitLab infrastructure.
 
 [SOLUTION PRESENTATION](https://docs.google.com/presentation/d/1uFq4Bfg03HZrYLTFa_bH5Ck0AFX1QfOCIq90ixVKZ3A/edit?usp=sharing)
 
-resources (test):
-- https://ibelogubov.ru/catalog << here you can check the site functilonality
-- https://monitoring.ibelogubov.ru/ << Prometheus UI, system/site metrics
-- https://grafana.ibelogubov.ru/ << Grafana UI, functional dashboards, logs explorer (credentials for test: admin/qwerty1)
+## Project keypoints (diploma tasks)
+- Code being stored and executed in GitLab
+- Project has .gitlab-ci.yml file containing assembling pipeline
+- Artefacts (binary, Docker images) being published in a repo/registery service (Nexus, GitLab registery)
+- Artefacts being versioned
+- Project has Dockerfiles for assembling Docker images (backend and frontend):
+  - backend: binary Go file in the images
+  - frontend: HTML-pages being distributed via Nginx
+- GitLab CI contains:
+  - artefacts assembling and publication steps
+  - tests
+  - deploy step
+- Kubernetes Managed Cluster being deployed in a Cloud
+- Kubernetes Managed Cluster and all required resources being described in accordance with IaC principle, code stored in GitLab
+- Terraform state being stored in S3 storage
+- Images (used in project) being stored in S3 storage
+- Secrets are hidden
+- Project has Kubernetes manifests for application deploy
+- Project has Helm charts for application deploy
+- Application being connected with logging and monitoring systems
+- Project has a dashboard containing logs/metrics
 
 ## Project structure:
 - "backend" folder - contains code (GO language) and CI pipeline for automatic assembling, image uploading to the registry storage, code tests and packaging into HELM chart;
 - "frontend" folder - code in JavaScript, TypeScript and same functionality as for backend module;
-- "helm" folder - contains description (data for assembling) of helm charts for deploy of 5 elements - backend, frontend, Prometheus (monitoring), Grafana and Loki+Promtail; 
+- "helm" folder - contains description (data for assembling) of helm charts for deploy of 5 elements - backend, frontend, Prometheus (monitoring), Grafana and Loki+Promtail;
 - "kubernetes" folder - additional element, contains kubernetes manifests (yaml) for deployment without HELM. CI files for backend/frontend have commented blocks for automated deploy to a cluster, you can use instead of HELM-related deployment (if needed)
 
 ## Required infrastructure
@@ -25,7 +42,7 @@ The project works on Yandex Cloud Managed Kubernetes Cluster. Components:
 - GitLab Container Registry for storing assembled images of backend and frontend.
 
 In order to start working with the current project, please make sure you have those points covered.
-In case you need to deploy a cluster, please [visit the infrastructure repository contains the required terraform files and description of steps](https://gitlab.praktikum-services.ru/yu.belogubov/momo-store-infrastructure)
+In case you need to deploy a cluster, please [visit the infrastructure repository containing the required terraform files and description of steps](https://github.com/ybelogubov/momo-store-infrastructure)
 
 ## Note regarding S3 storage
 In the project the object storage being used for storing 2 things - terraform state file(s) for the infrastructure and site images. In case you have your own object storage, you can change the path to the images in code (/backend/* - search for *.jpeg).
@@ -127,4 +144,4 @@ helm list
 - Kubernetes resources (full description of available commands can be found [here](https://kubernetes.io/docs/reference/kubectl/cheatsheet/) ):
 ```
 kubectl get all
-``` 
+```
